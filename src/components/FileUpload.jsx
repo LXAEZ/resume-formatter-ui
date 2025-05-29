@@ -14,14 +14,7 @@ const FileUpload = ({ onFileSelect }) => {
   const fileExtensions = "PDF, DOC, DOCX";
 
   const validateFile = (file) => {
-    if (!validFileTypes.includes(file.type)) {
-      setError(
-        `Invalid file type. Please upload ${fileExtensions} files only.`
-      );
-      return false;
-    }
-    setError("");
-    return true;
+    return validFileTypes.includes(file.type);
   };
 
   const handleDrag = (e) => {
@@ -35,26 +28,44 @@ const FileUpload = ({ onFileSelect }) => {
     }
   };
 
+  const processFiles = (fileList) => {
+    const files = Array.from(fileList);
+    const validFiles = [];
+    let hasError = false;
+
+    files.forEach((file) => {
+      if (validateFile(file)) {
+        validFiles.push(file);
+      } else {
+        hasError = true;
+      }
+    });
+
+    if (hasError) {
+      setError(`Some files were invalid. Only ${fileExtensions} are allowed.`);
+    } else {
+      setError("");
+    }
+
+    if (validFiles.length > 0) {
+      onFileSelect(validFiles); // Send array of valid files
+    }
+  };
+
   const handleDrop = (e) => {
     e.preventDefault();
     e.stopPropagation();
     setDragActive(false);
 
-    if (e.dataTransfer.files && e.dataTransfer.files[0]) {
-      const file = e.dataTransfer.files[0];
-      if (validateFile(file)) {
-        onFileSelect(file);
-      }
+    if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
+      processFiles(e.dataTransfer.files);
     }
   };
 
   const handleChange = (e) => {
     e.preventDefault();
-    if (e.target.files && e.target.files[0]) {
-      const file = e.target.files[0];
-      if (validateFile(file)) {
-        onFileSelect(file);
-      }
+    if (e.target.files && e.target.files.length > 0) {
+      processFiles(e.target.files);
     }
   };
 
@@ -87,6 +98,7 @@ const FileUpload = ({ onFileSelect }) => {
           type="file"
           id="file-upload"
           accept=".pdf,.doc,.docx,application/pdf,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+          multiple
           onChange={handleChange}
           style={{ display: "none" }}
         />
@@ -100,7 +112,7 @@ const FileUpload = ({ onFileSelect }) => {
         />
 
         <Typography variant="h6" component="h2" gutterBottom>
-          Drag and drop your resume
+          Drag and drop your resume(s)
         </Typography>
 
         <Typography
@@ -123,7 +135,7 @@ const FileUpload = ({ onFileSelect }) => {
             component="span"
             variant="outlined"
             sx={{
-              color: "#fffff",
+              color: "#00000",
               borderColor: "#B7B7B7",
               "&:hover": {
                 borderColor: "grey.600",

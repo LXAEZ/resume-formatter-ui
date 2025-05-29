@@ -46,9 +46,11 @@ export const AuthProvider = ({ children }) => {
       setToken(access_token);
       setUser(username);
       setIsAuthenticated(true); // Update authentication status
+      setError(null); // Clear any existing errors on successful login
       navigate("/resume");
     } catch (err) {
       setError(err.response?.data?.detail || "Login failed");
+      throw err; // Re-throw the error so the component can catch it
     } finally {
       setLoading(false);
     }
@@ -72,9 +74,11 @@ export const AuthProvider = ({ children }) => {
         }
       );
 
+      setError(null); // Clear any existing errors on successful signup
       // Automatically login after successful signup
     } catch (err) {
       setError(err.response?.data?.detail || "Signup failed");
+      throw err; // Re-throw the error so the component can catch it
     } finally {
       setLoading(false);
     }
@@ -87,6 +91,7 @@ export const AuthProvider = ({ children }) => {
     setToken(null);
     setUser(null);
     setIsAuthenticated(false); // Update authentication status
+    setError(null); // Clear any errors on logout
     navigate("/home");
   };
 

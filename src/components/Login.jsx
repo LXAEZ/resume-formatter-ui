@@ -1,187 +1,178 @@
 import React, { useState } from "react";
-import { useNavigate, Link as RouterLink } from "react-router-dom";
 import {
   Box,
+  TextField,
   Button,
-  Container,
+  Typography,
   IconButton,
   InputAdornment,
-  Paper,
-  TextField,
-  Typography,
   Alert,
-  Link,
+  CircularProgress,
 } from "@mui/material";
-import {
-  Visibility,
-  VisibilityOff,
-  LockOutlined,
-  PersonOutline,
-} from "@mui/icons-material";
-import { useAuth } from "../auth/AuthContext";
+import { Visibility, VisibilityOff } from "@mui/icons-material";
+import PersonIcon from "@mui/icons-material/Person";
+import LockIcon from "@mui/icons-material/Lock";
+import { useAuth } from "../auth/AuthContext"; // Adjust path as needed
 
-const Login = () => {
+const Login = ({ onSwitchToRegister, onClose }) => {
   const { login, loading, error } = useAuth();
-  const navigate = useNavigate();
-
+  const [formData, setFormData] = useState({ username: "", password: "" });
   const [showPassword, setShowPassword] = useState(false);
-  const [formData, setFormData] = useState({
-    username: "",
-    password: "",
-  });
-  const [success, setSuccess] = useState(""); // For success messages
+  const [submitted, setSubmitted] = useState(false);
+  const [success, setSuccess] = useState("");
 
   const handleChange = (e) => {
-    const { name, value } = e.target;
-    setFormData((prev) => ({ ...prev, [name]: value }));
+    setFormData((prev) => ({
+      ...prev,
+      [e.target.name]: e.target.value,
+    }));
+    if (submitted) setSubmitted(false);
+    if (success) setSuccess("");
   };
-  const [submitted, setSubmitted] = useState(false);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
     setSubmitted(true);
+    setSuccess(""); // Clear any previous success message
 
     if (!formData.username.trim() || !formData.password.trim()) {
-      setSuccess("");
       return;
     }
 
     try {
       await login(formData.username, formData.password);
-      setSuccess("Login successful! Redirecting...");
+      // Only set success message if login actually succeeds
+      setSuccess("Login successful!");
+      setTimeout(() => {
+        if (onClose) onClose();
+      }, 1500);
     } catch (err) {
+      // Clear success message on error (though it should already be cleared)
       setSuccess("");
     }
   };
 
   return (
     <Box
-      sx={{
-        minHeight: "100vh",
-        backgroundColor: "background.default",
-        display: "flex",
-        alignItems: "center",
-        justifyContent: "center",
-        px: 2,
-      }}
+      width="100%"
+      maxWidth={400}
+      borderRadius={2}
+      p={4}
+      boxShadow={0}
+      bgcolor="background.transparent"
     >
-      <Container maxWidth="xs">
-        <Paper elevation={4} sx={{ p: 4, borderRadius: 1 }}>
-          <Box textAlign="center" mb={3}>
-            <Typography variant="h4" fontWeight="bold">
-              Welcome back
-            </Typography>
-            <Typography variant="body2" color="text.secondary">
-              Enter your credentials to access your account
-            </Typography>
+      <Box textAlign="center" mb={4}>
+        <Typography variant="h4" fontWeight="bold">
+          Welcome back
+        </Typography>
+        <Typography variant="body2" color="text.secondary">
+          Enter your credentials to access your account
+        </Typography>
+      </Box>
+
+      {error && (
+        <Alert severity="error" sx={{ mb: 2 }}>
+          {error}
+        </Alert>
+      )}
+      {success && (
+        <Alert severity="success" sx={{ mb: 2 }}>
+          {success}
+        </Alert>
+      )}
+      {submitted &&
+        (!formData.username.trim() || !formData.password.trim()) && (
+          <Alert severity="error" sx={{ mb: 2 }}>
+            Username and password are required.
+          </Alert>
+        )}
+
+      <form onSubmit={handleSubmit}>
+        <Box mb={3}>
+          <Typography variant="subtitle2" gutterBottom>
+            Username
+          </Typography>
+          <TextField
+            name="username"
+            placeholder="john_doe"
+            fullWidth
+            required
+            value={formData.username}
+            onChange={handleChange}
+            disabled={loading}
+            InputProps={{
+              startAdornment: (
+                <InputAdornment position="start">
+                  <PersonIcon color="action" />
+                </InputAdornment>
+              ),
+            }}
+          />
+        </Box>
+
+        <Box mb={3}>
+          <Box
+            display="flex"
+            justifyContent="space-between"
+            alignItems="center"
+          >
+            <Typography variant="subtitle2">Password</Typography>
           </Box>
+          <TextField
+            name="password"
+            type={showPassword ? "text" : "password"}
+            placeholder="••••••••"
+            fullWidth
+            required
+            value={formData.password}
+            onChange={handleChange}
+            disabled={loading}
+            InputProps={{
+              startAdornment: (
+                <InputAdornment position="start">
+                  <LockIcon color="action" />
+                </InputAdornment>
+              ),
+              endAdornment: (
+                <InputAdornment position="end">
+                  <IconButton
+                    onClick={() => setShowPassword(!showPassword)}
+                    edge="end"
+                    disabled={loading}
+                  >
+                    {showPassword ? <VisibilityOff /> : <Visibility />}
+                  </IconButton>
+                </InputAdornment>
+              ),
+            }}
+          />
+        </Box>
 
-          {error && (
-            <Alert severity="error" sx={{ mb: 2 }}>
-              {error}
-            </Alert>
-          )}
-          {success && (
-            <Alert severity="success" sx={{ mb: 2 }}>
-              {success}
-            </Alert>
-          )}
-          {submitted &&
-            (!formData.username.trim() || !formData.password.trim()) && (
-              <Alert severity="error" sx={{ mb: 2 }}>
-                Username and password are required.
-              </Alert>
-            )}
+        <Button
+          type="submit"
+          variant="contained"
+          color="primary"
+          fullWidth
+          disabled={loading}
+          sx={{ py: 1.2 }}
+        >
+          {loading ? <CircularProgress size={24} color="inherit" /> : "Sign in"}
+        </Button>
+      </form>
 
-          <form onSubmit={handleSubmit} noValidate>
-            <TextField
-              fullWidth
-              required
-              margin="normal"
-              name="username"
-              label="Username"
-              placeholder="john_doe"
-              value={formData.username}
-              onChange={handleChange}
-              disabled={loading}
-              InputProps={{
-                startAdornment: (
-                  <InputAdornment position="start">
-                    <PersonOutline />
-                  </InputAdornment>
-                ),
-              }}
-            />
-
-            <TextField
-              fullWidth
-              required
-              margin="normal"
-              name="password"
-              label="Password"
-              placeholder="••••••••"
-              type={showPassword ? "text" : "password"}
-              value={formData.password}
-              onChange={handleChange}
-              disabled={loading}
-              InputProps={{
-                startAdornment: (
-                  <InputAdornment position="start">
-                    <LockOutlined />
-                  </InputAdornment>
-                ),
-                endAdornment: (
-                  <InputAdornment position="end">
-                    <IconButton
-                      edge="end"
-                      onClick={() => setShowPassword(!showPassword)}
-                      aria-label="toggle password visibility"
-                      disabled={loading}
-                    >
-                      {showPassword ? <VisibilityOff /> : <Visibility />}
-                    </IconButton>
-                  </InputAdornment>
-                ),
-              }}
-            />
-
-            <Box display="flex" justifyContent="space-between" mt={1} mb={2}>
-              <Link
-                component={RouterLink}
-                to="/forgot-password"
-                variant="body2"
-                underline="hover"
-              >
-                Forgot password?
-              </Link>
-            </Box>
-
-            <Button
-              type="submit"
-              variant="contained"
-              fullWidth
-              size="large"
-              disabled={loading}
-            >
-              {loading ? "Signing in..." : "Sign in"}
-            </Button>
-          </form>
-
-          <Box textAlign="center" mt={3}>
-            <Typography variant="body2">
-              Don&apos;t have an account?{" "}
-              <Link
-                component={RouterLink}
-                to="/register"
-                underline="hover"
-                color="primary"
-              >
-                Sign up
-              </Link>
-            </Typography>
-          </Box>
-        </Paper>
-      </Container>
+      <Box mt={3} textAlign="center">
+        <Typography variant="body2">
+          Don&apos;t have an account?{" "}
+          <Button
+            variant="text"
+            size="small"
+            onClick={onSwitchToRegister}
+            disabled={loading}
+          >
+            Sign up
+          </Button>
+        </Typography>
+      </Box>
     </Box>
   );
 };

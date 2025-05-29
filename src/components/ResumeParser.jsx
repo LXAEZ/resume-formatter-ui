@@ -12,6 +12,13 @@ import {
   useTheme,
   Tabs,
   Tab,
+  LinearProgress,
+  Table,
+  TableBody,
+  TableCell,
+  TableContainer,
+  TableHead,
+  TableRow,
 } from "@mui/material";
 import FileUpload from "./FileUpload";
 import ResumePreview from "./ResumePreview";
@@ -31,7 +38,7 @@ import JsonViewer from "./JsonViewer";
 const ResumeParser = () => {
   const { isAuthenticated } = useAuth();
   const [step, setStep] = useState(0);
-  const [file, setFile] = useState(null);
+  const [files, setFiles] = useState([]); // Changed to array for multiple files
   const [parsedData, setParsedData] = useState(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
@@ -56,8 +63,12 @@ const ResumeParser = () => {
     return <Login />;
   }
 
-  const handleFileSelect = (selectedFile) => {
-    setFile(selectedFile);
+  const handleFileSelect = (selectedFiles) => {
+    // Convert FileList to array if needed
+    const fileArray = Array.isArray(selectedFiles)
+      ? selectedFiles
+      : Array.from(selectedFiles);
+    setFiles(fileArray);
     setStep(1);
   };
 
@@ -78,7 +89,9 @@ const ResumeParser = () => {
     }, 200);
 
     try {
-      const data = await parseResume(file);
+      // Process all files (for now, we'll just process the first one)
+      // You can modify this to process all files
+      const data = await parseResume(files[0]);
 
       // Complete the progress
       setLoadingProgress(100);
@@ -87,8 +100,8 @@ const ResumeParser = () => {
       setTimeout(() => {
         const entry = {
           id: Date.now(),
-          name: file?.name,
-          size: file?.size,
+          name: files[0]?.name,
+          size: files[0]?.size,
           date: new Date().toLocaleString(),
           data,
         };
@@ -109,7 +122,7 @@ const ResumeParser = () => {
 
   const handleReset = () => {
     setStep(0);
-    setFile(null);
+    setFiles([]);
     setParsedData(null);
     setError(null);
     setViewMode("preview");
@@ -122,6 +135,10 @@ const ResumeParser = () => {
 
   const handleTabChange = (newValue) => {
     setActiveTab(newValue);
+  };
+
+  const formatFileSize = (bytes) => {
+    return (bytes / 1024 / 1024).toFixed(2);
   };
 
   return (
@@ -138,88 +155,61 @@ const ResumeParser = () => {
       </Typography>
 
       {/* Toggle Switch Button */}
-      <Box display="flex" justifyContent="left" mb={4}>
-        <Box
-          role="tablist"
-          aria-orientation="horizontal"
-          className="h-10 items-center justify-center rounded-md p-1 text-muted-foreground grid w-full grid-cols-2 lg:w-[400px]"
-          tabIndex={0}
-          data-orientation="horizontal"
-          sx={{
-            display: "grid",
-            gridTemplateColumns: "repeat(2, 1fr)",
-            width: { xs: "100%", lg: "400px" },
-            height: "50px",
-            borderRadius: "6px",
-            padding: "4px",
-            outline: "none",
-            backgroundColor: "#f3f4f6", // bg-muted equivalent
-          }}
-        >
-          <Button
-            type="button"
-            role="tab"
-            disableRipple
-            disableFocusRipple
-            aria-selected={activeTab === "upload"}
-            data-state={activeTab === "upload" ? "active" : "inactive"}
+      <div className="mb-4">
+        <div className="grid w-full grid-cols-2 rounded-md bg-gray-100 p-1 lg:w-[400px]">
+          <button
+            className={`flex items-center justify-center rounded-md py-2 text-sm font-medium transition ${
+              activeTab === "upload"
+                ? "bg-white text-gray-900 shadow-sm"
+                : "text-gray-500 hover:text-gray-900"
+            }`}
             onClick={() => setActiveTab("upload")}
-            sx={{
-              display: "inline-flex",
-              alignItems: "center",
-              justifyContent: "center",
-              whiteSpace: "nowrap",
-              borderRadius: "4px",
-              padding: "6px 12px",
-              fontSize: "14px",
-              fontWeight: 500,
-              transition: "all 0.2s",
-              textTransform: "none",
-              backgroundColor:
-                activeTab === "upload" ? "#ffffff" : "transparent",
-              color: activeTab === "upload" ? "#000000" : "#6b7280",
-              boxShadow:
-                activeTab === "upload"
-                  ? "0 1px 2px rgba(0, 0, 0, 0.05)"
-                  : "none",
-            }}
           >
-            <UploadIcon sx={{ mr: 1, height: 16, width: 16 }} />
+            <svg
+              xmlns="http://www.w3.org/2000/svg"
+              className="mr-2 h-4 w-4"
+              fill="none"
+              viewBox="0 0 24 24"
+              stroke="currentColor"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"
+              />
+            </svg>
             Upload
-          </Button>
-          <Button
-            type="button"
-            role="tab"
-            disableRipple
-            disableFocusRipple
-            aria-selected={activeTab === "history"}
-            data-state={activeTab === "history" ? "active" : "inactive"}
+          </button>
+          <button
+            className={`flex items-center justify-center rounded-md py-2 text-sm font-medium transition ${
+              activeTab === "history"
+                ? "bg-white text-gray-900 shadow-sm"
+                : "text-gray-500 hover:text-gray-900"
+            }`}
             onClick={() => setActiveTab("history")}
-            sx={{
-              display: "inline-flex",
-              alignItems: "center",
-              justifyContent: "center",
-              whiteSpace: "nowrap",
-              borderRadius: "4px",
-              padding: "6px 12px",
-              fontSize: "14px",
-              fontWeight: 500,
-              transition: "all 0.2s",
-              textTransform: "none",
-              backgroundColor:
-                activeTab === "history" ? "#ffffff" : "transparent",
-              color: activeTab === "history" ? "#000000" : "#6b7280",
-              boxShadow:
-                activeTab === "history"
-                  ? "0 1px 2px rgba(0, 0, 0, 0.05)"
-                  : "none",
-            }}
           >
-            <AccessTimeIcon sx={{ mr: 1, height: 16, width: 16 }} />
+            <svg
+              xmlns="http://www.w3.org/2000/svg"
+              className="mr-2 h-4 w-4"
+              fill="none"
+              viewBox="0 0 24 24"
+              stroke="currentColor"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"
+              />
+            </svg>
             History
-          </Button>
-        </Box>
-      </Box>
+          </button>
+        </div>
+
+        {/* Sample content based on tab */}
+        <div className="mt-4">{activeTab === "upload"}</div>
+      </div>
 
       <Paper
         elevation={3}
@@ -238,9 +228,10 @@ const ResumeParser = () => {
               Upload Resume
             </Typography>
             <Typography align="left" color="text.secondary" sx={{ mb: 4 }}>
-              Supported formats PDF and Word documents.
+              Supported formats PDF and Word documents. You can select multiple
+              files.
             </Typography>
-            <FileUpload onFileSelect={handleFileSelect} />
+            <FileUpload onFileSelect={handleFileSelect} multiple={true} />
 
             <Box
               display="flex"
@@ -260,76 +251,121 @@ const ResumeParser = () => {
 
         {activeTab === "upload" && step === 1 && (
           <>
-            <Typography variant="h5" align="left" sx={{ fontWeight: 550 }}>
-              Upload Resume
-            </Typography>
-            <Typography align="left" color="text.secondary" sx={{ mb: 4 }}>
-              Supported formats PDF and Word documents.
-            </Typography>
+            {/* Title & Loading Bar Row */}
             <Box
               sx={{
-                border: "1px solid #e5e7eb",
-                borderRadius: "8px",
-                p: 3,
-                position: "relative",
-                overflow: "hidden",
-                backgroundColor: "#ffffff",
+                display: "flex",
+                justifyContent: "space-between",
+                alignItems: "center",
+                mb: 0.5,
               }}
             >
-              {/* Loading Bar Background */}
+              <Typography variant="h5" align="left" sx={{ fontWeight: 550 }}>
+                Upload Resume
+              </Typography>
+
               {loading && (
                 <Box
                   sx={{
-                    position: "absolute",
-                    top: 0,
-                    left: 0,
-                    width: `${loadingProgress}%`,
-                    height: "100%",
-                    backgroundColor: "rgba(0, 255, 46, 0.3)", // Green transparent
-                    transition: "width 0.3s ease-out",
-                    zIndex: 1,
+                    width: 250,
+                    backgroundColor: "transparent",
+                    p: 0,
+                    borderRadius: 0,
+                    boxShadow: "none",
+                    border: "none",
                   }}
-                />
-              )}
-
-              <Box
-                display="flex"
-                justifyContent="space-between"
-                alignItems="center"
-                sx={{ position: "relative", zIndex: 2 }}
-              >
-                <Box display="flex" alignItems="center" gap={2}>
-                  {/* Rounded Icon with background */}
-                  <Box
-                    sx={{
-                      display: "flex",
-                      alignItems: "center",
-                      justifyContent: "center",
-                      borderRadius: "50%",
-                      background: "#D7D7D7",
-                      width: 40, // Icon size
-                      height: 40, // Icon size
-                    }}
-                  >
-                    <DescriptionOutlinedIcon
-                      sx={{ fontSize: 20, color: "#fffff" }}
+                >
+                  <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
+                    <LinearProgress
+                      variant="determinate"
+                      value={loadingProgress}
+                      sx={{
+                        flexGrow: 1,
+                        height: 4,
+                        borderRadius: 2,
+                        "& .MuiLinearProgress-bar": {
+                          backgroundColor: "#00ff2e",
+                        },
+                      }}
                     />
-                  </Box>
-
-                  <Box>
-                    {/* File name */}
-                    <Typography variant="subtitle1" sx={{ fontWeight: "500" }}>
-                      {file?.name}
-                    </Typography>
-
-                    {/* File size below file name */}
-                    <Typography variant="body2" color="text.secondary">
-                      {(file?.size / 1024 / 1024).toFixed(2)} MB
+                    <Typography
+                      variant="caption"
+                      color="text.secondary"
+                      sx={{ whiteSpace: "nowrap" }}
+                    >
+                      {Math.round(loadingProgress)}%
                     </Typography>
                   </Box>
                 </Box>
-              </Box>
+              )}
             </Box>
+
+            {/* Files selected count - below title */}
+            <Typography align="left" color="text.secondary" sx={{ mb: 4 }}>
+              {files.length} file{files.length !== 1 ? "s" : ""} selected
+            </Typography>
+
+            {/* Files Table - Windows Explorer Style */}
+            <TableContainer
+              component={Paper}
+              sx={{
+                border: "1px solid #e5e7eb",
+                borderRadius: "8px",
+                mb: 2,
+                boxShadow: 0,
+                maxHeight: 300,
+                overflow: "auto",
+              }}
+            >
+              <Table stickyHeader size="small">
+                <TableHead>
+                  <TableRow sx={{ bgcolor: "#f8f9fa" }}>
+                    <TableCell sx={{ fontWeight: 600, width: "60px" }}>
+                      S.No
+                    </TableCell>
+                    <TableCell sx={{ fontWeight: 600 }}>
+                      <Box display="flex" alignItems="center">
+                        <DescriptionOutlinedIcon sx={{ fontSize: 16, mr: 1 }} />
+                        Name
+                      </Box>
+                    </TableCell>
+                    <TableCell
+                      sx={{ fontWeight: 600, width: "120px" }}
+                      align="right"
+                    >
+                      Size (Kb)
+                    </TableCell>
+                  </TableRow>
+                </TableHead>
+                <TableBody>
+                  {files.map((file, index) => (
+                    <TableRow
+                      key={index}
+                      sx={{
+                        "&:nth-of-type(odd)": { bgcolor: "#fafafa" },
+                      }}
+                    >
+                      <TableCell sx={{ py: 1.5 }}>{index + 1}</TableCell>
+                      <TableCell sx={{ py: 1.5 }}>
+                        <Box display="flex" alignItems="center">
+                          <DescriptionOutlinedIcon
+                            sx={{ fontSize: 16, mr: 1, color: "#666" }}
+                          />
+                          <Typography variant="body2" sx={{ fontWeight: 500 }}>
+                            {file.name}
+                          </Typography>
+                        </Box>
+                      </TableCell>
+                      <TableCell align="right" sx={{ py: 1.5 }}>
+                        <Typography variant="body2" color="text.secondary">
+                          {(file.size / 1024).toFixed(2)} KB
+                        </Typography>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </TableContainer>
 
             {error && (
               <Box
@@ -377,9 +413,13 @@ const ResumeParser = () => {
                   fontWeight: 500,
                   "&:hover": { bgcolor: "#333333", boxShadow: 0 },
                 }}
-                disabled={!file || loading}
+                disabled={files.length === 0 || loading}
               >
-                {loading ? "Uploading" : "Upload Resume"}
+                {loading
+                  ? "Processing..."
+                  : `Process ${files.length} File${
+                      files.length !== 1 ? "s" : ""
+                    }`}
               </Button>
             </Box>
           </>
@@ -619,87 +659,43 @@ const ResumeParser = () => {
           </IconButton>
 
           {/* Title */}
-          <Typography variant="h6" mb={2} sx={{ mt: 6, textAlign: "center" }}>
+          <Typography variant="h6" mb={2} sx={{ mt: 4, textAlign: "center" }}>
             {selectedResume?.name}
           </Typography>
 
           {/* Toggle Switch Button for Modal */}
           <Box display="flex" justifyContent="left" mb={4} ml={7}>
-            <Box
-              role="tablist"
-              aria-orientation="horizontal"
-              tabIndex={0}
-              sx={{
-                display: "grid",
-                gridTemplateColumns: "repeat(2, 1fr)",
-                width: { xs: "100%", sm: "200px" }, // Smaller than before
-                height: "38px", // Reduced height
-                borderRadius: "6px",
-                padding: "2px",
-                outline: "none",
-                backgroundColor: "#f3f4f6",
-              }}
-            >
-              <Button
-                type="button"
-                role="tab"
-                disableRipple
-                disableFocusRipple
-                aria-selected={modalViewMode === "preview"}
-                onClick={() => setModalViewMode("preview")}
-                sx={{
-                  px: "10px",
-                  py: "4px",
-                  fontSize: "13px",
-                  fontWeight: 500,
-                  borderRadius: "4px",
-                  textTransform: "none",
-                  transition: "all 0.2s",
-                  backgroundColor:
-                    modalViewMode === "preview" ? "#ffffff" : "transparent",
-                  color: modalViewMode === "preview" ? "#000000" : "#6b7280",
-                  boxShadow:
-                    modalViewMode === "preview"
-                      ? "0 1px 2px rgba(0, 0, 0, 0.05)"
-                      : "none",
-                }}
-              >
-                Preview
-              </Button>
-              <Button
-                type="button"
-                role="tab"
-                disableRipple
-                disableFocusRipple
-                aria-selected={modalViewMode === "json"}
-                onClick={() => setModalViewMode("json")}
-                sx={{
-                  px: "10px",
-                  py: "4px",
-                  fontSize: "13px",
-                  fontWeight: 500,
-                  borderRadius: "4px",
-                  textTransform: "none",
-                  transition: "all 0.2s",
-                  backgroundColor:
-                    modalViewMode === "json" ? "#ffffff" : "transparent",
-                  color: modalViewMode === "json" ? "#000000" : "#6b7280",
-                  boxShadow:
-                    modalViewMode === "json"
-                      ? "0 1px 2px rgba(0, 0, 0, 0.05)"
-                      : "none",
-                }}
-              >
-                JSON Data
-              </Button>
-            </Box>
+            <div className="mb-4">
+              <div className="grid w-full grid-cols-2 rounded-md bg-gray-100 p-1 lg:w-[200px]">
+                <button
+                  className={`flex items-center justify-center rounded-md py-1.5 text-sm font-medium transition ${
+                    viewMode === "preview"
+                      ? "bg-white text-gray-900 shadow-sm"
+                      : "text-gray-500 hover:text-gray-900"
+                  }`}
+                  onClick={() => setViewMode("preview")}
+                >
+                  Preview
+                </button>
+                <button
+                  className={`flex items-center justify-center rounded-md py-1.5 text-sm font-medium transition ${
+                    viewMode === "json"
+                      ? "bg-white text-gray-900 shadow-sm"
+                      : "text-gray-500 hover:text-gray-900"
+                  }`}
+                  onClick={() => setViewMode("json")}
+                >
+                  JSON Data
+                </button>
+              </div>
+            </div>
           </Box>
 
           {/* Content */}
-          <Box sx={{ flexGrow: 1, overflowY: "auto", px: 2 }}>
+          <Box sx={{ flexGrow: 1, overflowY: "auto", px: 2, mt: 1 }}>
             <Box
               sx={{
-                maxWidth: "800px", // Control the width of preview/json content
+                maxWidth: "1200px", // Control the width of preview/json content
                 mx: "auto", // Center horizontally
                 width: "100%", // Allow responsiveness
               }}
