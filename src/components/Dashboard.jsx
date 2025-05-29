@@ -73,7 +73,9 @@ export default function Home() {
                 to="/resume"
                 className="text-sm font-medium text-muted-foreground transition-colors hover:text-foreground"
               >
+                
                 Dashboard
+
               </Link>
             )}
           </nav>
