@@ -8,7 +8,7 @@ import {
   Button,
   Divider,
 } from "@mui/material";
-import { FileJson } from "lucide-react";
+import { Copy, CheckLine } from "lucide-react";
 import ContentCopyIcon from "@mui/icons-material/ContentCopy";
 import CheckIcon from "@mui/icons-material/Check";
 import ReactJson from "react-json-view";
@@ -72,21 +72,18 @@ const JsonViewer = ({ data }) => {
       <Box
         sx={{
           display: "flex",
-          justifyContent: "space-between",
+          justifyContent: "flex-end",
           alignItems: "center",
           mb: 2,
         }}
       >
-        <Typography variant="h6" sx={{ fontWeight: 600 }}>
-          JSON Data
-        </Typography>
         <Button
-          variant="contained"
-          startIcon={copied ? <CheckIcon /> : <ContentCopyIcon />}
+          variant="outlined"
+          startIcon={copied ? <CheckLine size={16} /> : <Copy size={16} />}
           onClick={handleCopyJson}
           color={copied ? "success" : "primary"}
         >
-          {copied ? "Copied!" : "Copy JSON"}
+          {copied ? "Copied" : "Copy JSON"}
         </Button>
       </Box>
 

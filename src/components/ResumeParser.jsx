@@ -1,50 +1,42 @@
-import React, { useState, useEffect } from "react";
+"use client";
+
+import { useState, useEffect } from "react";
 import {
   Box,
   Paper,
   Typography,
   Button,
-  Menu,
-  MenuItem,
-  Card,
-  CardContent,
-  Divider,
-  useTheme,
-  Tabs,
-  Tab,
   LinearProgress,
+  Alert,
   Table,
   TableBody,
   TableCell,
   TableContainer,
   TableHead,
+  IconButton,
+  Tooltip,
   TableRow,
 } from "@mui/material";
 import FileUpload from "./FileUpload";
-import ResumePreview from "./ResumePreview";
+import ResumeListView from "./ResumeListView";
+import ResumePreviewModal from "./ResumePreviewModal";
 import { useAuth } from "../auth/AuthContext";
-import { parseResume } from "../services/api";
+import { parseMultipleResumes, deleteResume } from "../services/api";
 import Login from "./Login";
 import ArrowBackOutlinedIcon from "@mui/icons-material/ArrowBackOutlined";
 import DescriptionOutlinedIcon from "@mui/icons-material/DescriptionOutlined";
-import VisibilityOutlinedIcon from "@mui/icons-material/VisibilityOutlined";
-import MoreVertIcon from "@mui/icons-material/MoreVert";
-import UploadIcon from "@mui/icons-material/Upload";
-import AccessTimeIcon from "@mui/icons-material/AccessTime";
-import { Settings } from "lucide-react";
-import { Modal, IconButton } from "@mui/material";
-import JsonViewer from "./JsonViewer";
+import CloseIcon from "@mui/icons-material/Close";
 
 const ResumeParser = () => {
   const { isAuthenticated } = useAuth();
   const [step, setStep] = useState(0);
-  const [files, setFiles] = useState([]); // Changed to array for multiple files
-  const [parsedData, setParsedData] = useState(null);
+  const [files, setFiles] = useState([]);
+  const [parsedResumes, setParsedResumes] = useState([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
-  const [viewMode, setViewMode] = useState("preview");
-  const [modalViewMode, setModalViewMode] = useState("preview"); // or "json"
   const [loadingProgress, setLoadingProgress] = useState(0);
+  const [selectedResume, setSelectedResume] = useState(null);
+  const [activeTab, setActiveTab] = useState("upload");
 
   const [history, setHistory] = useState(() => {
     if (typeof window !== "undefined") {
@@ -53,18 +45,18 @@ const ResumeParser = () => {
     }
     return [];
   });
+
   useEffect(() => {
     localStorage.setItem("resumeHistory", JSON.stringify(history));
   }, [history]);
-  const [activeTab, setActiveTab] = useState("upload");
-  const [selectedResume, setSelectedResume] = useState(null);
 
   if (!isAuthenticated) {
     return <Login />;
   }
-
+  const handleRemoveFile = (indexToRemove) => {
+    setFiles((prev) => prev.filter((_, i) => i !== indexToRemove));
+  };
   const handleFileSelect = (selectedFiles) => {
-    // Convert FileList to array if needed
     const fileArray = Array.isArray(selectedFiles)
       ? selectedFiles
       : Array.from(selectedFiles);
@@ -89,30 +81,43 @@ const ResumeParser = () => {
     }, 200);
 
     try {
-      // Process all files (for now, we'll just process the first one)
-      // You can modify this to process all files
-      const data = await parseResume(files[0]);
+      // Process all files
+      const result = await parseMultipleResumes(files);
 
       // Complete the progress
       setLoadingProgress(100);
 
       // Small delay to show completion
       setTimeout(() => {
-        const entry = {
-          id: Date.now(),
-          name: files[0]?.name,
-          size: files[0]?.size,
-          date: new Date().toLocaleString(),
-          data,
-        };
-        setParsedData(data);
-        setHistory((prev) => [...prev, entry]);
-        setStep(2);
+        if (result.results && result.results.length > 0) {
+          setParsedResumes(result.results);
+
+          // Add to history
+          const newHistoryEntries = result.results.map((resume) => ({
+            id: resume.id,
+            name: resume.filename,
+            size: resume.file_size,
+            date: new Date().toLocaleString(),
+            data: resume.parsed_data,
+          }));
+
+          setHistory((prev) => [...prev, ...newHistoryEntries]);
+          setStep(2);
+        }
+
+        if (result.errors && result.errors.length > 0) {
+          setError(
+            `${result.errors.length} files failed to process: ${result.errors
+              .map((e) => e.filename)
+              .join(", ")}`
+          );
+        }
+
         setLoadingProgress(0);
       }, 500);
     } catch (err) {
       clearInterval(progressInterval);
-      setError(err.message || "Failed to parse resume");
+      setError(err.message || "Failed to parse resumes");
       setLoadingProgress(0);
     } finally {
       clearInterval(progressInterval);
@@ -123,18 +128,23 @@ const ResumeParser = () => {
   const handleReset = () => {
     setStep(0);
     setFiles([]);
-    setParsedData(null);
+    setParsedResumes([]);
     setError(null);
-    setViewMode("preview");
     setLoadingProgress(0);
   };
 
-  const handleChangeView = (event, newValue) => {
-    setViewMode(newValue);
+  const handlePreviewResume = (resume) => {
+    setSelectedResume(resume);
   };
 
-  const handleTabChange = (newValue) => {
-    setActiveTab(newValue);
+  const handleDeleteResume = async (resumeId) => {
+    try {
+      await deleteResume(resumeId);
+      setParsedResumes((prev) => prev.filter((r) => r.id !== resumeId));
+      setHistory((prev) => prev.filter((h) => h.id !== resumeId));
+    } catch (error) {
+      setError("Failed to delete resume");
+    }
   };
 
   const formatFileSize = (bytes) => {
@@ -206,9 +216,6 @@ const ResumeParser = () => {
             History
           </button>
         </div>
-
-        {/* Sample content based on tab */}
-        <div className="mt-4">{activeTab === "upload"}</div>
       </div>
 
       <Paper
@@ -218,14 +225,14 @@ const ResumeParser = () => {
           borderRadius: 1,
           mt: 2,
           boxShadow: 0,
-          border: "1px,solid,  #e5e7eb",
+          border: "1px solid #e5e7eb",
         }}
       >
         {/* Upload View */}
         {activeTab === "upload" && step === 0 && (
           <>
             <Typography variant="h5" align="left" sx={{ fontWeight: 550 }}>
-              Upload Resume
+              Upload Resumes
             </Typography>
             <Typography align="left" color="text.secondary" sx={{ mb: 4 }}>
               Supported formats PDF and Word documents. You can select multiple
@@ -243,7 +250,7 @@ const ResumeParser = () => {
                 Cancel
               </Button>
               <Button variant="contained" disabled>
-                Upload Resume
+                Upload Resumes
               </Button>
             </Box>
           </>
@@ -260,52 +267,34 @@ const ResumeParser = () => {
                 mb: 0.5,
               }}
             >
-              <Typography variant="h5" align="left" sx={{ fontWeight: 550 }}>
-                Upload Resume
+              <Typography variant="h5" sx={{ fontWeight: 550 }}>
+                Upload Resumes
               </Typography>
 
               {loading && (
-                <Box
-                  sx={{
-                    width: 250,
-                    backgroundColor: "transparent",
-                    p: 0,
-                    borderRadius: 0,
-                    boxShadow: "none",
-                    border: "none",
-                  }}
-                >
-                  <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
-                    <LinearProgress
-                      variant="determinate"
-                      value={loadingProgress}
-                      sx={{
-                        flexGrow: 1,
-                        height: 4,
-                        borderRadius: 2,
-                        "& .MuiLinearProgress-bar": {
-                          backgroundColor: "#00ff2e",
-                        },
-                      }}
-                    />
-                    <Typography
-                      variant="caption"
-                      color="text.secondary"
-                      sx={{ whiteSpace: "nowrap" }}
-                    >
-                      {Math.round(loadingProgress)}%
-                    </Typography>
-                  </Box>
+                <Box width={150} sx={{ display: "flex", alignItems: "center" }}>
+                  <LinearProgress
+                    variant="determinate"
+                    value={loadingProgress}
+                    sx={{
+                      flexGrow: 1,
+                      height: 4,
+                      borderRadius: 2,
+                      "& .MuiLinearProgress-bar": {
+                        backgroundColor: "#00ff2e",
+                      },
+                    }}
+                  />
                 </Box>
               )}
             </Box>
 
-            {/* Files selected count - below title */}
-            <Typography align="left" color="text.secondary" sx={{ mb: 4 }}>
+            {/* Files selected count */}
+            <Typography color="text.secondary" sx={{ mb: 4 }}>
               {files.length} file{files.length !== 1 ? "s" : ""} selected
             </Typography>
 
-            {/* Files Table - Windows Explorer Style */}
+            {/* Files Table */}
             <TableContainer
               component={Paper}
               sx={{
@@ -320,46 +309,65 @@ const ResumeParser = () => {
               <Table stickyHeader size="small">
                 <TableHead>
                   <TableRow sx={{ bgcolor: "#f8f9fa" }}>
-                    <TableCell sx={{ fontWeight: 600, width: "60px" }}>
+                    <TableCell sx={{ fontWeight: 600, width: 40 }}>
                       S.No
                     </TableCell>
-                    <TableCell sx={{ fontWeight: 600 }}>
-                      <Box display="flex" alignItems="center">
-                        <DescriptionOutlinedIcon sx={{ fontSize: 16, mr: 1 }} />
-                        Name
-                      </Box>
-                    </TableCell>
+                    <TableCell sx={{ fontWeight: 600 }}>Name</TableCell>
                     <TableCell
-                      sx={{ fontWeight: 600, width: "120px" }}
+                      sx={{ fontWeight: 600, width: 120 }}
                       align="right"
                     >
-                      Size (Kb)
+                      Size (KB)
                     </TableCell>
+                    <TableCell sx={{ fontWeight: 600, width: 40 }}>
+                      Actions
+                    </TableCell>
+                    {/* for remove */}
                   </TableRow>
                 </TableHead>
                 <TableBody>
                   {files.map((file, index) => (
                     <TableRow
                       key={index}
-                      sx={{
-                        "&:nth-of-type(odd)": { bgcolor: "#fafafa" },
-                      }}
+                      sx={{ "&:nth-of-type(odd)": { bgcolor: "#fafafa" } }}
                     >
-                      <TableCell sx={{ py: 1.5 }}>{index + 1}</TableCell>
-                      <TableCell sx={{ py: 1.5 }}>
+                      <TableCell>{index + 1}.</TableCell>
+                      <TableCell>
                         <Box display="flex" alignItems="center">
                           <DescriptionOutlinedIcon
                             sx={{ fontSize: 16, mr: 1, color: "#666" }}
                           />
-                          <Typography variant="body2" sx={{ fontWeight: 500 }}>
+                          <Typography variant="body2" fontWeight={500}>
                             {file.name}
                           </Typography>
                         </Box>
                       </TableCell>
-                      <TableCell align="right" sx={{ py: 1.5 }}>
-                        <Typography variant="body2" color="text.secondary">
+                      <TableCell align="right">
+                        <Typography
+                          color="text.secondary"
+                          sx={{ fontSize: 13 }}
+                        >
                           {(file.size / 1024).toFixed(2)} KB
                         </Typography>
+                      </TableCell>
+                      <TableCell>
+                        <Box
+                          display="flex"
+                          justifyContent="center"
+                          alignItems="center"
+                        >
+                          <Tooltip title="Delete" arrow>
+                            <IconButton
+                              size="small"
+                              onClick={() => handleRemoveFile(index)}
+                            >
+                              <CloseIcon
+                                fontSize="small"
+                                sx={{ color: "error.main" }}
+                              />
+                            </IconButton>
+                          </Tooltip>
+                        </Box>
                       </TableCell>
                     </TableRow>
                   ))}
@@ -368,20 +376,9 @@ const ResumeParser = () => {
             </TableContainer>
 
             {error && (
-              <Box
-                sx={{
-                  width: "100%",
-                  maxWidth: "100%",
-                  mb: 2,
-                  display: "flex",
-                  flexDirection: "column",
-                  alignItems: "center",
-                }}
-              >
-                <Typography color="error" sx={{ mt: 1 }}>
-                  {error}
-                </Typography>
-              </Box>
+              <Alert severity="error" sx={{ mb: 2 }}>
+                {error}
+              </Alert>
             )}
 
             <Box
@@ -392,28 +389,26 @@ const ResumeParser = () => {
             >
               <Button
                 variant="outlined"
-                color="secondary"
                 onClick={handleReset}
                 disabled={loading}
+                sx={{ px: 3, py: 1.2, fontWeight: 500 }}
               >
                 Cancel
               </Button>
 
               <Button
                 variant="contained"
-                color="primary"
                 onClick={handleProcess}
+                disabled={files.length === 0 || loading}
                 sx={{
                   bgcolor: "#1e1e1e",
                   boxShadow: 0,
                   borderRadius: 1,
                   px: 3,
                   py: 1.2,
-                  textTransform: "none",
                   fontWeight: 500,
                   "&:hover": { bgcolor: "#333333", boxShadow: 0 },
                 }}
-                disabled={files.length === 0 || loading}
               >
                 {loading
                   ? "Processing..."
@@ -425,85 +420,33 @@ const ResumeParser = () => {
           </>
         )}
 
-        {activeTab === "upload" && step === 2 && parsedData && (
+        {activeTab === "upload" && step === 2 && (
           <Box>
-            {/* View Mode Tabs */}
-            <Box textAlign="left" mt={0}>
-              <Button
-                onClick={handleReset}
-                variant="outlined"
-                sx={{
-                  border: 0,
-                  height: "40px",
-                  color: "#374151", // slate-700
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "center",
-                  transition: "all 0.2s ease",
-                  "&:hover": {
-                    borderColor: "#9CA3AF",
-                  },
-                }}
-              >
-                <ArrowBackOutlinedIcon sx={{ fontSize: 15 }} />
-                Back
-              </Button>
-            </Box>
-            <Tabs
-              value={viewMode}
-              onChange={handleChangeView}
-              centered
-              sx={{ mb: 3 }}
-              indicatorColor="primary"
-              textColor="primary"
+            <ResumeListView
+              resumes={parsedResumes}
+              onPreview={handlePreviewResume}
+              onDelete={handleDeleteResume}
+            />
+
+            <Button
+              onClick={handleReset}
+              variant="outlined"
+              sx={{
+                border: 0,
+                height: "40px",
+                color: "#374151",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                transition: "all 0.2s ease",
+                "&:hover": {
+                  borderColor: "#9CA3AF",
+                },
+              }}
             >
-              <Tab value="preview" label="Preview" />
-              <Tab value="json" label="JSON Data" />
-            </Tabs>
-
-            {/* Preview Mode */}
-            {viewMode === "preview" && (
-              <Box px={4}>
-                <Card
-                  variant="outlined"
-                  sx={{
-                    p: 2,
-                    width: "100%",
-                    boxShadow: 0,
-                    maxWidth: 1000, // or your preferred width like 700, 600, etc.
-                    mx: "auto",
-                  }}
-                >
-                  <Box
-                    sx={{
-                      width: "100%",
-                      maxWidth: 1000, // or your preferred width like 700, 600, etc.
-                      mx: "auto", // centers the preview inside the Card
-                    }}
-                  >
-                    <ResumePreview parsedData={parsedData} />
-                  </Box>
-                </Card>
-              </Box>
-            )}
-
-            {/* JSON View Mode */}
-            {viewMode === "json" && (
-              <Box px={4}>
-                <Card
-                  variant="outlined"
-                  sx={{
-                    p: 2,
-                    width: "100%",
-                    boxShadow: 0,
-                    maxWidth: 1000, // or your preferred width like 700, 600, etc.
-                    mx: "auto",
-                  }}
-                >
-                  <JsonViewer data={parsedData} />
-                </Card>
-              </Box>
-            )}
+              <ArrowBackOutlinedIcon sx={{ fontSize: 15 }} />
+              Back
+            </Button>
           </Box>
         )}
 
@@ -520,195 +463,31 @@ const ResumeParser = () => {
             {history.length === 0 ? (
               <Box sx={{ textAlign: "center", py: 8 }}>
                 <Typography variant="body1" color="text.secondary">
-                  No resume history found. Upload a resume to get started.
+                  No resume history found. Upload resumes to get started.
                 </Typography>
               </Box>
             ) : (
-              <Box
-                sx={{
-                  maxHeight: 400,
-                  overflowY: "auto",
-                  pr: 1,
-                }}
-              >
-                <Box
-                  sx={{
-                    display: "flex",
-                    flexDirection: "column",
-                    gap: 1.5,
-                    pb: 1,
-                  }}
-                >
-                  {[...history].reverse().map((entry) => (
-                    <Box
-                      key={entry.id}
-                      sx={{
-                        border: "1px solid #e5e7eb",
-                        borderRadius: "8px",
-                        p: 1.5,
-                        display: "flex",
-                        justifyContent: "space-between",
-                        alignItems: "center",
-                        minWidth: "100%",
-                      }}
-                    >
-                      <Box display="flex" alignItems="center" gap={1.5}>
-                        <Box
-                          sx={{
-                            display: "flex",
-                            alignItems: "center",
-                            justifyContent: "center",
-                            borderRadius: "50%",
-                            background: "#E4E3E4",
-                            width: 34,
-                            height: 34,
-                          }}
-                        >
-                          <DescriptionOutlinedIcon
-                            sx={{ fontSize: 18, color: "#2F2F2F" }}
-                          />
-                        </Box>
-                        <Box>
-                          <Typography
-                            variant="subtitle2"
-                            sx={{ fontWeight: 500, lineHeight: 1.2 }}
-                          >
-                            {entry.name}
-                          </Typography>
-                          <Typography
-                            variant="caption"
-                            color="text.secondary"
-                            sx={{ lineHeight: 1.2 }}
-                          >
-                            {(entry.size / 1024 / 1024).toFixed(2)} MB
-                          </Typography>
-                          <Typography
-                            variant="caption"
-                            color="text.secondary"
-                            sx={{ display: "block", lineHeight: 1.2 }}
-                          >
-                            {entry.date}
-                          </Typography>
-                        </Box>
-                      </Box>
-                      <IconButton
-                        onClick={() => setSelectedResume(entry)}
-                        sx={{
-                          borderRadius: "20%",
-                          border: 1,
-                          borderColor: "#B7B7B7",
-                          "&:hover": { bgcolor: "#e5e7eb" },
-                          p: 1,
-                        }}
-                      >
-                        <VisibilityOutlinedIcon
-                          sx={{ fontSize: 20, color: "#454545" }}
-                        />
-                      </IconButton>
-                    </Box>
-                  ))}
-                </Box>
-              </Box>
+              <ResumeListView
+                resumes={history.map((h) => ({
+                  id: h.id,
+                  filename: h.name,
+                  file_size: h.size,
+                  parsed_data: h.data,
+                  status: "success",
+                }))}
+                onPreview={handlePreviewResume}
+              />
             )}
           </>
         )}
       </Paper>
+
       {/* Resume Preview Modal */}
-      <Modal
+      <ResumePreviewModal
         open={!!selectedResume}
-        onClose={() => {
-          setSelectedResume(null);
-          setModalViewMode("preview");
-        }}
-        sx={{
-          display: "flex",
-          alignItems: "stretch",
-          justifyContent: "stretch",
-        }}
-      >
-        <Box
-          sx={{
-            bgcolor: "background.paper",
-            p: 2,
-            borderRadius: 0,
-            width: "100vw",
-            height: "100vh",
-            overflowY: "auto",
-            position: "relative",
-            display: "flex",
-            flexDirection: "column",
-          }}
-        >
-          {/* Back Button */}
-          <IconButton
-            onClick={() => {
-              setSelectedResume(null);
-              setModalViewMode("preview");
-            }}
-            sx={{
-              position: "fixed",
-              top: 16,
-              left: 16,
-              zIndex: 1300, // above modal content
-              bgcolor: "background.default",
-              boxShadow: 1,
-            }}
-            aria-label="Back"
-          >
-            <ArrowBackOutlinedIcon />
-          </IconButton>
-
-          {/* Title */}
-          <Typography variant="h6" mb={2} sx={{ mt: 4, textAlign: "center" }}>
-            {selectedResume?.name}
-          </Typography>
-
-          {/* Toggle Switch Button for Modal */}
-          <Box display="flex" justifyContent="left" mb={4} ml={7}>
-            <div className="mb-4">
-              <div className="grid w-full grid-cols-2 rounded-md bg-gray-100 p-1 lg:w-[200px]">
-                <button
-                  className={`flex items-center justify-center rounded-md py-1.5 text-sm font-medium transition ${
-                    viewMode === "preview"
-                      ? "bg-white text-gray-900 shadow-sm"
-                      : "text-gray-500 hover:text-gray-900"
-                  }`}
-                  onClick={() => setViewMode("preview")}
-                >
-                  Preview
-                </button>
-                <button
-                  className={`flex items-center justify-center rounded-md py-1.5 text-sm font-medium transition ${
-                    viewMode === "json"
-                      ? "bg-white text-gray-900 shadow-sm"
-                      : "text-gray-500 hover:text-gray-900"
-                  }`}
-                  onClick={() => setViewMode("json")}
-                >
-                  JSON Data
-                </button>
-              </div>
-            </div>
-          </Box>
-
-          {/* Content */}
-          <Box sx={{ flexGrow: 1, overflowY: "auto", px: 2, mt: 1 }}>
-            <Box
-              sx={{
-                maxWidth: "1200px", // Control the width of preview/json content
-                mx: "auto", // Center horizontally
-                width: "100%", // Allow responsiveness
-              }}
-            >
-              {modalViewMode === "preview" ? (
-                <ResumePreview parsedData={selectedResume?.data} />
-              ) : (
-                <JsonViewer data={selectedResume?.data} />
-              )}
-            </Box>
-          </Box>
-        </Box>
-      </Modal>
+        onClose={() => setSelectedResume(null)}
+        resume={selectedResume}
+      />
     </Box>
   );
 };

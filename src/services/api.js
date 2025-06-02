@@ -46,7 +46,7 @@ export const parseMultipleResumes = async (files) => {
   const formData = new FormData();
 
   // Append each file to FormData
-  files.forEach((file, index) => {
+  files.forEach((file) => {
     formData.append("files", file);
   });
 
@@ -68,22 +68,41 @@ export const parseMultipleResumes = async (files) => {
   }
 };
 
-export const downloadResumeAsZip = async (fileIds) => {
+export const getResumesData = async (fileIds) => {
   try {
     const response = await axios.post(
-      `${API_URL}/download-resumes-zip`,
+      `${API_URL}/get-resumes-data`,
       { file_ids: fileIds },
       {
         headers: {
           "Content-Type": "application/json",
         },
-        responseType: "blob",
       }
     );
 
-    return new Blob([response.data], { type: "application/zip" });
+    return response.data;
   } catch (error) {
-    console.error("Error downloading zip:", error);
-    throw new Error("Failed to download resumes as zip");
+    console.error("Error fetching resumes data:", error);
+    throw new Error("Failed to fetch resumes data");
+  }
+};
+
+export const getResume = async (resumeId) => {
+  try {
+    const response = await axios.get(`${API_URL}/resume/${resumeId}`);
+    return response.data;
+  } catch (error) {
+    console.error("Error fetching resume:", error);
+    throw new Error("Failed to fetch resume");
+  }
+};
+
+export const deleteResume = async (resumeId) => {
+  try {
+    const response = await axios.delete(`${API_URL}/resume/${resumeId}`);
+    return response.data;
+  } catch (error) {
+    console.error("Error deleting resume:", error);
+    throw new Error("Failed to delete resume");
   }
 };

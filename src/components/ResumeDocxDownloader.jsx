@@ -536,3 +536,5 @@ const createSectionHeading = (title, color = "000000") =>
       }),
     ],
   });
+
+  export { createStyledSections };
